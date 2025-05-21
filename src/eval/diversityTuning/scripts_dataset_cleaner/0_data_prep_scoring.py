@@ -9,7 +9,7 @@ from argparse import ArgumentParser
 # set arguments
 parser = ArgumentParser()
 # add the arguments
-parser.add_argument("--data_path", default="data/writingPrompt_uncleaned", type=str, help="Path to the dataset")
+parser.add_argument("--data_path", default="data/diversityTuning/writingPrompt_uncleaned", type=str, help="Path to the dataset")
 parser.add_argument("--source", default="euclaise/WritingPrompts_preferences", type=str, help="Source of the dataset")
 
 args = parser.parse_args()

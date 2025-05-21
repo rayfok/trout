@@ -6,8 +6,8 @@ This repository allows you to, given prompts and desired distributions over
 target strings, fine-tune language models to output those distributions.
 
 Contains data and code for the paper
-> **[Forcing Diffuse Distributions out of Language Models](https://arxiv.org/abs/2404.10859)**  
-> Yiming Zhang, Avi Schwarzschild, Nicholas Carlini, Zico Kolter and Daphne Ippolito  
+> **[Forcing Diffuse Distributions out of Language Models](https://arxiv.org/abs/2404.10859)**
+> Yiming Zhang, Avi Schwarzschild, Nicholas Carlini, Zico Kolter and Daphne Ippolito
 > COLM 2024
 
 ## Installing
@@ -94,7 +94,7 @@ from the fine-tuned model.
 
 ### Generation
 
-**Sampling from the base model**: `python src/generate.py --config $CONFIG --mode untuned`  
+**Sampling from the base model**: `python src/generate.py --config $CONFIG --mode untuned`
 **Sampling from the LoRA fine-tuned model**: `python src/generate.py --config $CONFIG --mode lora`
 
 See `src/generate.py` for additional arguments.
@@ -107,7 +107,7 @@ MIT
 
 ```bibtex
 @misc{zhang2024forcing,
-      title={Forcing Diffuse Distributions out of Language Models}, 
+      title={Forcing Diffuse Distributions out of Language Models},
       author={Yiming Zhang and Avi Schwarzschild and Nicholas Carlini and Zico Kolter and Daphne Ippolito},
       year={2024},
       eprint={2404.10859},

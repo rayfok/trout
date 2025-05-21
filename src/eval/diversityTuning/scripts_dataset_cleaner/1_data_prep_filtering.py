@@ -7,8 +7,8 @@ from transformers import AutoTokenizer
 # set arguments
 parser = ArgumentParser()
 # add the arguments
-parser.add_argument("--data_path", default="data/writingPrompt_cleaned", type=str, help="Path to the dataset")
-parser.add_argument("--source", default="data/writingPrompt_uncleaned", type=str, help="Path to the dataset")
+parser.add_argument("--data_path", default="data/diversityTuning/writingPrompt_cleaned", type=str, help="Path to the dataset")
+parser.add_argument("--source", default="data/diversityTuning/writingPrompt_uncleaned", type=str, help="Path to the dataset")
 parser.add_argument("--model_to_use", default="meta-llama/Llama-3.1-8B-Instruct", type=str, help="Model to use for training")
 
 args = parser.parse_args()
@@ -42,7 +42,7 @@ def remove_long(example):
     long_comments = messages['attention_mask'].sum(dim=1) <= 2048
     long_comments = long_comments.numpy()
     # get the text from row
-    
+
     example['filtered_comment_texts'] = [ comment for comment, long_comment in zip(example['filtered_comment_texts'], long_comments) if long_comment]
     example['filtered_comment_scores'] = [ score for score, long_comment in zip(example['filtered_comment_scores'], long_comments) if long_comment]
     example['filtered_transformed_scores'] = [ score for score, long_comment in zip(example['filtered_transformed_scores'], long_comments) if long_comment]
@@ -68,7 +68,7 @@ def filtering(example):
       continue
     if "**Off-Topic Discussion**" in cur_comment:
       continue
-    
+
 
     new_cur_comments.append(cur_comment)
     new_cur_comment_scores.append(cur_comment_score)

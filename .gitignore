@@ -1,4 +1,75 @@
-env/
-data/
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
-*.pyc
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.conda/
+*.egg
+.eggs/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Packaging
+build/
+develop-eggs/
+dist/
+downloads/
+*.egg-info/
+.eggs/
+*.whl
+
+# Poetry
+poetry.lock
+
+# Pytest
+.cache/
+.pytest_cache/
+
+# mypy
+.mypy_cache/
+
+# Coverage
+.coverage
+coverage.xml
+htmlcov/
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+.history/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Local .env files
+.env
+.env.*
+
+# Temporary files
+*.swp
+*.swo
+*.bak
+*~
+
+# Specific project things
+data/
+results/
