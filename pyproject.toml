@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "rf-diversity"
+version = "0.1.0"
+description = "improving diversity of LM outputs"
+authors = ["Raymond Fok (rayfok@cs.washington.edu"]
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+datasets = "^3.6.0"
+transformers = "^4.52.2"
+peft = "^0.15.2"
+evaluate = "^0.4.3"
+sentence-transformers = "^4.1.0"
+trl = "^0.17.0"
+openai = "^1.81.0"
+anthropic = "^0.51.0"
+together = "^1.5.8"
+hf-transfer = "^0.1.9"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
