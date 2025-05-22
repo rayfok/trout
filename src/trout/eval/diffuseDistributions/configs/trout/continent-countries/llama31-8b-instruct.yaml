@@ -1,0 +1,8 @@
+model: meta-llama/Llama-3.1-8B-Instruct
+train_prompts: []
+test_prompts:
+ - src/trout/eval/diffuseDistributions/prompts/continent-countries
+alg_config:
+  n_iters: 50
+  early_stop: true
+output_dir: results-lora/Llama-3.1-8B-Instruct/continent-countries

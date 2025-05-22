@@ -25,7 +25,9 @@ dependencies = [
   "sentencepiece==0.2.0",
   "accelerate==1.7.0",
   "einops==0.8.1",
-  "omegaconf==2.3.0"
+  "omegaconf==2.3.0",
+  "ray==2.46.0",
+  "vllm==0.8.5"
 ]
 
 [tool.setuptools.packages.find]
