@@ -51,9 +51,9 @@ def compute_coverage(preds: list[str], targets: list[str]):
     return len(preds_set.intersection(targets_set)) / len(targets_set)
 
 
-class SimilarityScorer:
+class DiversityScorer:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
-        self.model = SentenceTransformer(model_name)
+        self.model = SentenceTransformer(model_name, trust_remote_code=True)
 
     def average_pairwise_cosine_similarity(self, strings: list[str]) -> float:
         if len(strings) < 2:
@@ -65,3 +65,6 @@ class SimilarityScorer:
         n = len(strings)
         upper_indices = np.triu_indices(n, k=1)
         return sim_matrix[upper_indices].mean()
+
+    def average_pairwise_diversity(self, strings: list[str]) -> float:
+        return 1 - self.average_pairwise_cosine_similarity(strings)

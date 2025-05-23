@@ -5,7 +5,7 @@ import os
 import numpy as np
 from datasets import load_dataset
 
-from trout.metrics import SimilarityScorer
+from trout.metrics import DiversityScorer
 from trout.utils.chat_models import get_chat_model
 
 
@@ -53,7 +53,7 @@ def generate(
 
 
 def evaluate(completions_file: str, results_output_file: str):
-    sim_scorer = SimilarityScorer(model_name="all-MiniLM-L6-v2")
+    sim_scorer = DiversityScorer(model_name="all-MiniLM-L6-v2")
 
     with open(completions_file, "r") as f:
         prompt_completions = [json.loads(line.strip()) for line in f.readlines()]
@@ -104,6 +104,7 @@ def main():
     args = parser.parse_args()
 
     prompts = load_prompts()
+    prompts = prompts[:10]
 
     generate_and_evaluate(
         prompts=prompts,

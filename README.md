@@ -19,6 +19,10 @@ Evaluate with `./src/trout/eval/diffuseDistributions/scripts/evaluate/<model_nam
 (From [Modifying Large Language Model Post-Training for Diverse
 Creative Writing](https://arxiv.org/pdf/2503.17126))
 
+Generate and evaluate with `./src/trout/eval/diversityTuning/scripts/run_<model_name>.sh`
+
+- Generations saved to `data/diversityTuning/<model_name>.jsonl`
+- Results saved to `results/diversityTuning/<model_name>.json`
 
 ### hivemind
 

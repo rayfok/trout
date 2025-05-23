@@ -1,20 +1,19 @@
-import numpy as np
-import torch
 import pickle
-from torch.utils.data import Dataset
+
 import datasets
+import evaluate
 import numpy as np
 import torch
 from torch.nn import CrossEntropyLoss
+from torch.utils.data import Dataset
+from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-import evaluate
-from evaluate import logging
 
 def transform_scores(scores, min_score=None, max_score=None, compression_factor=100):
     """
     Transform scores to [-1, 1] range with configurable compression.
-    
+
     Parameters:
     scores (array-like): Input scores
     min_score (float): Minimum score in the dataset (if None, will use min of scores)
@@ -23,32 +22,33 @@ def transform_scores(scores, min_score=None, max_score=None, compression_factor=
     compression_factor (float): Controls compression strength (higher = more compression)
         - For 'log': number of times to apply log transformation
         - For 'power': exponent to use (should be between 0 and 1)
-    
+
     Returns:
     array-like: Transformed scores in [-1, 1] range
     """
     scores = np.array(scores)
-    
+
     # Use provided min/max or compute from data
     min_score = min_score if min_score is not None else scores.min()
     max_score = max_score if max_score is not None else scores.max()
-    
+
     # Shift scores to be positive
     shifted_scores = scores - min_score + 1  # Add 1 to avoid log(0)
 
     min_trans = min_score
     max_trans = max_score
-    
+
     # Apply log transformation multiple times based on compression_factor
     transformed = shifted_scores.copy()
     for _ in range(int(compression_factor)):
         transformed = np.log(transformed + 1)  # Add 1 to avoid log(0)
         min_trans = np.log(min_trans + 1)
         max_trans = np.log(max_trans + 1)
-    
+
     normalized = 2 * (transformed - min_trans) / (max_trans - min_trans) - 1
-    
+
     return normalized
+
 
 class EarlyStopping:
     def __init__(self, patience=10, min_delta=0, verbose=False):
@@ -59,7 +59,7 @@ class EarlyStopping:
         self.best_loss = None
         self.early_stop = False
         self.best_model = None
-        
+
     def __call__(self, val_loss, model_indicator):
         if self.best_loss is None:
             self.best_loss = val_loss
@@ -67,7 +67,7 @@ class EarlyStopping:
         elif val_loss > self.best_loss - self.min_delta:
             self.counter += 1
             if self.verbose:
-                print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+                print(f"EarlyStopping counter: {self.counter} out of {self.patience}")
             if self.counter >= self.patience:
                 self.early_stop = True
                 print("Early stopping - best is model", self.best_model)
@@ -76,40 +76,42 @@ class EarlyStopping:
             self.best_model = model_indicator
             self.counter = 0
 
+
 class FlattenedDataset(Dataset):
     """
     Custom Dataset class to handle data and label pairs
     """
+
     def __init__(self, data, labels):
-      self.data = data
-            
-      if not isinstance(labels, torch.Tensor):
-          self.labels = torch.FloatTensor(np.array(labels)).to(torch.bfloat16)
-      else:
-          self.labels = labels
-      # check if there is no NaN or infinitity in the labels
-      if torch.isnan(self.labels).any() or torch.isinf(self.labels).any():
-        raise ValueError("Labels should not contain NaN or infinity")
-    
+        self.data = data
+
+        if not isinstance(labels, torch.Tensor):
+            self.labels = torch.FloatTensor(np.array(labels)).to(torch.bfloat16)
+        else:
+            self.labels = labels
+        # check if there is no NaN or infinitity in the labels
+        if torch.isnan(self.labels).any() or torch.isinf(self.labels).any():
+            raise ValueError("Labels should not contain NaN or infinity")
+
     def __len__(self):
         return len(self.data)
-    
+
     def __getitem__(self, idx):
         return self.data[idx], self.labels[idx]
 
     def save_to_disk(self, path):
-      with open(path, 'wb') as f:
-        save = {
-          "data": self.data,
-          "labels": self.labels.to(torch.float32).numpy(),
-        }
-        pickle.dump(save, f)
-    
+        with open(path, "wb") as f:
+            save = {
+                "data": self.data,
+                "labels": self.labels.to(torch.float32).numpy(),
+            }
+            pickle.dump(save, f)
+
     @classmethod
     def load_from_disk(cls, path):
-      with open(path, 'rb') as f:
-        save = pickle.load(f)
-        return cls(save["data"], save["labels"])
+        with open(path, "rb") as f:
+            save = pickle.load(f)
+            return cls(save["data"], save["labels"])
 
 
 _CITATION = """\
@@ -179,7 +181,7 @@ class Perplexity(evaluate.Metric):
         return evaluate.MetricInfo(
             module_type="metric",
             description=_DESCRIPTION,
-            citation= _CITATION,
+            citation=_CITATION,
             # inputs_description=_KWARGS_DESCRIPTION,
             features=datasets.Features(
                 {
@@ -190,25 +192,36 @@ class Perplexity(evaluate.Metric):
         )
 
     def _compute(
-        self, predictions, model_id=None, modelNtokenizer=None, batch_size: int = 16, add_start_token: bool = True, device=None, max_length=None
+        self,
+        predictions,
+        model_id=None,
+        modelNtokenizer=None,
+        batch_size: int = 16,
+        add_start_token: bool = True,
+        device=None,
+        max_length=None,
     ):
 
         if device is not None:
             if "cuda" not in device:
-                assert device in ["gpu", "cpu", "cuda"], "device should be either gpu or cpu."
+                assert device in [
+                    "gpu",
+                    "cpu",
+                    "cuda",
+                ], "device should be either gpu or cpu."
             if device == "gpu":
                 device = "cuda"
         else:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-        
+
         if model_id:
             model = AutoModelForCausalLM.from_pretrained(model_id)
             model = model.to(device)
 
             tokenizer = AutoTokenizer.from_pretrained(model_id)
         elif modelNtokenizer:
-            model = modelNtokenizer['model']
-            tokenizer = modelNtokenizer['tokenizer']
+            model = modelNtokenizer["model"]
+            tokenizer = modelNtokenizer["tokenizer"]
         else:
             raise ValueError("Either model_id or modelNtokenizer should be provided.")
 
@@ -216,7 +229,9 @@ class Perplexity(evaluate.Metric):
         # if there is not an already assigned pad_token, assign an existing
         # special token to also be the padding token
         if tokenizer.pad_token is None and batch_size > 1:
-            existing_special_tokens = list(tokenizer.special_tokens_map_extended.values())
+            existing_special_tokens = list(
+                tokenizer.special_tokens_map_extended.values()
+            )
             # check that the model already has at least one special token defined
             assert (
                 len(existing_special_tokens) > 0
@@ -248,7 +263,9 @@ class Perplexity(evaluate.Metric):
 
         # check that each input is long enough:
         if add_start_token:
-            assert torch.all(torch.ge(attn_masks.sum(1), 1)), "Each input text must be at least one token long."
+            assert torch.all(
+                torch.ge(attn_masks.sum(1), 1)
+            ), "Each input text must be at least one token long."
         else:
             assert torch.all(
                 torch.ge(attn_masks.sum(1), 2)
@@ -257,16 +274,24 @@ class Perplexity(evaluate.Metric):
         ppls = []
         loss_fct = CrossEntropyLoss(reduction="none")
 
-        for start_index in logging.tqdm(range(0, len(encoded_texts), batch_size)):
+        for start_index in tqdm(range(0, len(encoded_texts), batch_size)):
             end_index = min(start_index + batch_size, len(encoded_texts))
             encoded_batch = encoded_texts[start_index:end_index]
             attn_mask = attn_masks[start_index:end_index]
 
             if add_start_token:
-                bos_tokens_tensor = torch.tensor([[tokenizer.bos_token_id]] * encoded_batch.size(dim=0)).to(device)
+                bos_tokens_tensor = torch.tensor(
+                    [[tokenizer.bos_token_id]] * encoded_batch.size(dim=0)
+                ).to(device)
                 encoded_batch = torch.cat([bos_tokens_tensor, encoded_batch], dim=1)
                 attn_mask = torch.cat(
-                    [torch.ones(bos_tokens_tensor.size(), dtype=torch.int64).to(device), attn_mask], dim=1
+                    [
+                        torch.ones(bos_tokens_tensor.size(), dtype=torch.int64).to(
+                            device
+                        ),
+                        attn_mask,
+                    ],
+                    dim=1,
                 )
 
             labels = encoded_batch
@@ -279,7 +304,10 @@ class Perplexity(evaluate.Metric):
             shift_attention_mask_batch = attn_mask[..., 1:].contiguous()
 
             perplexity_batch = torch.exp(
-                (loss_fct(shift_logits.transpose(1, 2), shift_labels) * shift_attention_mask_batch).sum(1)
+                (
+                    loss_fct(shift_logits.transpose(1, 2), shift_labels)
+                    * shift_attention_mask_batch
+                ).sum(1)
                 / shift_attention_mask_batch.sum(1)
             )
 
@@ -291,30 +319,33 @@ class Perplexity(evaluate.Metric):
 import random
 from typing import List, Tuple
 
-def sample_pairs_with_gap(numbers: List[int], num_pairs: int = -1, min_gap: int = 1) -> List[Tuple[int, int]]:
+
+def sample_pairs_with_gap(
+    numbers: List[int], num_pairs: int = -1, min_gap: int = 1
+) -> List[Tuple[int, int]]:
     """
     Sample pairs of different integers from a list, attempting to maintain a minimum gap between paired numbers.
-    
+
     Args:
         numbers: List of integers to sample from
         num_pairs: Number of pairs to sample
         min_gap: Minimum desired gap between numbers in a pair (if possible)
-    
+
     Returns:
         List of tuples containing the sampled pairs
     """
     if len(numbers) < 2:
         return [], []
-    
+
     # Make a copy and sort the numbers
     number_with_index = [(num, idx) for idx, num in enumerate(numbers)]
     sorted_nums = sorted(number_with_index, key=lambda x: x[0])
 
     available_nums = [numset for numset in sorted_nums]
     pairs = []
-    
+
     while len(available_nums) >= 2:
-        if num_pairs > 0 and len(pairs) >= num_pairs :
+        if num_pairs > 0 and len(pairs) >= num_pairs:
             break
         # Try to find pairs with minimum gap first
         valid_pairs = []
@@ -324,17 +355,19 @@ def sample_pairs_with_gap(numbers: List[int], num_pairs: int = -1, min_gap: int 
                 num2set = available_nums[nidx2]
                 if num1set[0] != num2set[0] and abs(num1set[0] - num2set[0]) >= min_gap:
                     valid_pairs.append((num1set, num2set))
-        
+
         # If no pairs with minimum gap are available, fall back to any valid pair
         if not valid_pairs:
-            valid_pairs = [(available_nums[nidx1], available_nums[nidx2]) 
-                          for nidx1 in range(len(available_nums))
-                          for nidx2 in range(nidx1 + 1, len(available_nums))
-                          if available_nums[nidx1][0] != available_nums[nidx2][0]]
-        
+            valid_pairs = [
+                (available_nums[nidx1], available_nums[nidx2])
+                for nidx1 in range(len(available_nums))
+                for nidx2 in range(nidx1 + 1, len(available_nums))
+                if available_nums[nidx1][0] != available_nums[nidx2][0]
+            ]
+
         if not valid_pairs:
             break
-            
+
         # Randomly select a pair
         chosen_pair = random.choice(valid_pairs)
         pairs.append(chosen_pair)
@@ -342,32 +375,35 @@ def sample_pairs_with_gap(numbers: List[int], num_pairs: int = -1, min_gap: int 
         removed_idxs = [chosen_pair[0][1], chosen_pair[1][1]]
 
         # Remove used numbers
-        available_nums = [numset for numset in available_nums if numset[1] not in removed_idxs]
-    
+        available_nums = [
+            numset for numset in available_nums if numset[1] not in removed_idxs
+        ]
+
     return pairs, available_nums
 
 
-from peft import PeftModel, PeftConfig, LoraConfig
 import torch
+from peft import LoraConfig, PeftConfig, PeftModel
+
 
 def copy_peft_adapter(loaded_peft_model, new_adapter_name):
     """
     Copy an existing PEFT adapter to create a new adapter with a different name.
-    
+
     Args:
         base_model: The original base model
         loaded_peft_model: The PEFT model with the adapter you want to copy
         new_adapter_name: Name for the new adapter copy
-    
+
     Returns:
         PeftModel with both the original and copied adapter
     """
     # Get the original adapter name
     original_adapter_name = loaded_peft_model.active_adapter
-    
+
     # Get the configuration of the original adapter
     original_config = loaded_peft_model.peft_config[original_adapter_name]
-    
+
     # # Create a new config for the copied adapter
     # new_config = PeftConfig(
     #     peft_type=original_config.peft_type,
@@ -380,20 +416,20 @@ def copy_peft_adapter(loaded_peft_model, new_adapter_name):
     #     target_modules=original_config.target_modules
     # )
     new_config = LoraConfig(
-        r = original_config.r,
-        lora_alpha = original_config.lora_alpha,
-        bias = original_config.bias,
-        task_type = original_config.task_type,
+        r=original_config.r,
+        lora_alpha=original_config.lora_alpha,
+        bias=original_config.bias,
+        task_type=original_config.task_type,
     )
-    
+
     # Add the new adapter to the model
     loaded_peft_model.add_adapter(new_adapter_name, new_config)
-    
+
     # Copy the weights from the original adapter to the new one
     with torch.no_grad():
         for name, param in loaded_peft_model.state_dict().items():
             if original_adapter_name in name:
                 new_name = name.replace(original_adapter_name, new_adapter_name)
                 loaded_peft_model.state_dict()[new_name].copy_(param)
-    
+
     return loaded_peft_model

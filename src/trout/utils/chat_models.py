@@ -1,3 +1,8 @@
+"""
+Common issues:
+- Use `export VLLM_WORKER_MULTIPROC_METHOD=spawn` if you get some RuntimeError("Engine core initialization failed...)
+"""
+
 import json
 import os
 import time
@@ -6,8 +11,7 @@ import anthropic
 import openai
 from together import Together
 from tqdm import tqdm
-from transformers import (AutoTokenizer, PreTrainedTokenizer,
-                          PreTrainedTokenizerFast)
+from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
 from vllm import LLM, SamplingParams
 
 # from data.model_prompt_templates.chat_model_templates import get_chat_model_templates
@@ -528,7 +532,9 @@ class VLLM:
         **kwargs,
     ):
         max_num_seqs = kwargs.get("max_num_seqs", max_num_seqs)
-        gpu_memory_utilization = kwargs.get("gpu_memory_utilization", gpu_memory_utilization)
+        gpu_memory_utilization = kwargs.get(
+            "gpu_memory_utilization", gpu_memory_utilization
+        )
 
         model = LLM(
             model=model_name_or_path,
