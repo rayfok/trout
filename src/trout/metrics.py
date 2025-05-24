@@ -32,7 +32,7 @@ def compute_entropy(probs: np.ndarray, base: float = np.e) -> float:
     return -np.sum(probs * np.log(probs)) / np.log(base)
 
 
-def compute_coverage(preds: list[str], targets: list[str]):
+def compute_coverage_over_targets(preds: list[str], targets: list[str]):
     """
     Computes coverage of predictions over targets.
 
@@ -51,6 +51,19 @@ def compute_coverage(preds: list[str], targets: list[str]):
     return len(preds_set.intersection(targets_set)) / len(targets_set)
 
 
+def compute_coverage(preds: list[str]):
+    """
+    Computes coverage of predictions.
+
+    Args:
+        preds (list[str]): List of predicted strings.
+
+    Returns:
+        int: Coverage value.
+    """
+    return len(set(preds))
+
+
 class DiversityScorer:
     def __init__(self, model_name="all-MiniLM-L6-v2"):
         self.model = SentenceTransformer(model_name, trust_remote_code=True)
@@ -59,7 +72,10 @@ class DiversityScorer:
         if len(strings) < 2:
             return 1.0
         embeddings = self.model.encode(
-            strings, convert_to_numpy=True, normalize_embeddings=True
+            strings,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+            show_progress_bar=False,
         )
         sim_matrix = embeddings @ embeddings.T
         n = len(strings)

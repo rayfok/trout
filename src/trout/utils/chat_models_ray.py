@@ -531,6 +531,9 @@ class VLLM:
         **kwargs,
     ):
         max_num_seqs = kwargs.get("max_num_seqs", max_num_seqs)
+        gpu_memory_utilization = kwargs.get(
+            "gpu_memory_utilization", gpu_memory_utilization
+        )
 
         model = LLM(
             model=model_name_or_path,

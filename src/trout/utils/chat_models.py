@@ -389,7 +389,9 @@ class VLLM:
         self, messages: list, tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast
     ):
         formatted_prompts = [
-            tokenizer.apply_chat_template(p, tokenize=False, add_generation_prompt=True)
+            tokenizer.apply_chat_template(
+                p, tokenize=False, add_generation_prompt=True, enable_thinking=False
+            )
             for p in messages
         ]
         return formatted_prompts
@@ -534,6 +536,14 @@ class VLLM:
         max_num_seqs = kwargs.get("max_num_seqs", max_num_seqs)
         gpu_memory_utilization = kwargs.get(
             "gpu_memory_utilization", gpu_memory_utilization
+        )
+        print(
+            {
+                "model_name_or_path": model_name_or_path,
+                "max_num_seqs": max_num_seqs,
+                "gpu_memory_utilization": gpu_memory_utilization,
+                "num_gpus": num_gpus,
+            }
         )
 
         model = LLM(

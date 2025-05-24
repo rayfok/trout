@@ -1,74 +1,202 @@
+import argparse
+import json
+import os
+
 import datasets
-import torch
+import numpy as np
+from tqdm import tqdm
 
-from trout.eval.diversityTuning.models.diversity_model import DiversityModel
 from trout.metrics import DiversityScorer
-
-ds = datasets.load_from_disk("data/diversityTuning/writingPrompt_cleaned")
-val_dataset = ds["test"]
-print(val_dataset)
-
-# sample 1000
-val_dataset = val_dataset.select(range(1000, 2000))
-
-post_texts = val_dataset["post_text"]
-post_titles = val_dataset["post_title"]
-filtered_comment_texts = val_dataset["filtered_comment_texts"]
-filtered_comment_scores = val_dataset["filtered_comment_scores"]
-filtered_transformed_scores = val_dataset["filtered_transformed_scores"]
-
-# for i in range(500):
-#     # print(f"post_texts: {post_texts[i]}")
-#     print(f"[POST TITLE] {post_titles[i]}\n")
-#     # print(f"filtered_comment_texts: {filtered_comment_texts[i]}")
-#     # print(f"filtered_comment_scores: {filtered_comment_scores[i]}")
-#     # print(f"filtered_transformed_scores: {filtered_transformed_scores[i]}")
-#     # print()
-
-#     # print(len(filtered_comment_texts[i]))
+from trout.utils.chat_models import get_chat_model
 
 
-texts1 = [
-    "Why don’t cats play poker in the jungle? Too many cheetahs.",
-    "I asked my cat if she wanted to hear a joke. She said, 'Paw-sibly.'",
-    "What do you call a pile of kittens? A meow-tain.",
-    "Why was the cat sitting on the computer? It wanted to keep an eye on the mouse.",
-    "What do cats like to eat for breakfast? Mice Krispies.",
-    "My cat's favorite button on the keyboard is paws.",
-    "Why did the cat get kicked out of school? It was a real claw-en troublemaker.",
-    "How do cats end a fight? They hiss and make up.",
-    "Why did the cat bring a ladder? Because it wanted to reach the meow-sic notes.",
-    "What’s a cat’s favorite movie? The Sound of Mewsic.",
-]
+def generate(
+    prompts: list[str],
+    model_name: str,
+    batch_size: int,
+    n: int,
+    num_tokens: int,
+    temperature: float,
+    top_p: float,
+    output_file: str,
+):
+    params = {
+        "model_name": model_name,
+        "batch_size": batch_size,
+        "n": n,
+        "num_tokens": num_tokens,
+        "temperature": temperature,
+        "top_p": top_p,
+        "output_file": output_file,
+        "num_prompts": len(prompts),
+    }
+    print("Generation parameters:", json.dumps(params, indent=2))
 
-texts2 = [
-    "The stock market surged after better-than-expected earnings reports.",
-    "What if dreams are just alternate timelines playing out?",
-    "ERROR 404: The page you're looking for doesn't exist.",
-    "He sprinted through the rain, clutching the last train ticket.",
-    "Welcome to Cooking with Carla — today we're making spicy ramen!",
-    "Congratulations! You've unlocked a secret achievement.",
-    "Gravity pulls us all, but ambition makes us fly.",
-    "Why do cats knock things off tables for no reason?",
-    "Chapter 7: The Shadow in the Mirror",
-    "Reminder: Your dentist appointment is tomorrow at 9:00 AM.",
-]
+    model = get_chat_model(
+        model_name=model_name,
+        config={
+            "use_tqdm": False,
+            "max_num_seqs": batch_size,
+            "gpu_memory_utilization": 0.8,
+            "temperature": temperature,
+            "top_p": top_p,
+            "num_tokens": num_tokens,
+            "n_devices": 2,
+        },
+    )
+
+    # Adding a simple instruction to give context to the model
+    prompts_with_instr = [
+        f"Write a creative writing response based on the user-given writing prompt: {prompt}"
+        for prompt in prompts
+    ]
+
+    generations = []
+    for prompt in tqdm(prompts_with_instr):
+        duplicated_prompts = [prompt for _ in range(n)]
+        completions = model.batch_generate(duplicated_prompts)
+        generations.append(
+            {
+                "prompt": prompt,
+                "completions": completions,
+            }
+        )
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    print(f"Writing generations to {output_file}")
+    with open(output_file, "w") as f:
+        for generation in generations:
+            f.write(json.dumps(generation) + "\n")
+    print("Done!")
 
 
-semantic_diversity_model_name = "jinaai/jina-embeddings-v3"
-style_diversity_model_name = "AnnaWegmann/Style-Embedding"
-device = "cuda" if torch.cuda.is_available() else "cpu"
+def evaluate(completions_file: str, results_output_file: str):
+    semantic_diversity_model_name = "jinaai/jina-embeddings-v3"
+    style_diversity_model_name = "AnnaWegmann/Style-Embedding"
 
-semantic_div_model = DiversityScorer(
-    model_name=semantic_diversity_model_name, device=device
-)
-style_div_model = DiversityScorer(model_name=style_diversity_model_name, device=device)
-avg_style_div1 = style_div_model.average_pairwise_diversity(texts1)
-avg_sem_div1 = semantic_div_model.average_pairwise_diversity(texts1)
-avg_style_div2 = style_div_model.average_pairwise_diversity(texts2)
-avg_sem_div2 = semantic_div_model.average_pairwise_diversity(texts2)
+    semantic_model = DiversityScorer(model_name=semantic_diversity_model_name)
+    style_model = DiversityScorer(model_name=style_diversity_model_name)
 
-print(f"Average Semantic Diversity Score 1: {avg_sem_div1}")
-print(f"Average Style Diversity Score 1: {avg_style_div1}")
-print(f"Average Semantic Diversity Score 2: {avg_sem_div2}")
-print(f"Average Style Diversity Score 2: {avg_style_div2}")
+    with open(completions_file, "r") as f:
+        prompt_completions = [json.loads(line.strip()) for line in f.readlines()]
+
+    semantic_diversity_scores = []
+    style_diversity_scores = []
+    for c in prompt_completions:
+        completions = c["completions"]
+        sem_div_score = semantic_model.average_pairwise_diversity(completions)
+        style_div_score = style_model.average_pairwise_diversity(completions)
+        semantic_diversity_scores.append(sem_div_score)
+        style_diversity_scores.append(style_div_score)
+
+    os.makedirs(os.path.dirname(results_output_file), exist_ok=True)
+    with open(results_output_file, "w") as f:
+        avg_sem_div = float(np.mean(semantic_diversity_scores))
+        avg_style_div = float(np.mean(style_diversity_scores))
+        results = {
+            "avg_semantic_diversity": avg_sem_div,
+            "avg_style_diversity": avg_style_div,
+        }
+        json.dump(results, f, indent=2)
+
+
+def generate_and_evaluate(
+    prompts: list[str],
+    model_name_or_path: str,
+    completions_output_file: str,
+    results_output_file: str,
+    n_completions: int,
+    n_batch_size: int,
+    max_new_tokens: int,
+    temperature: float,
+    top_p: float,
+):
+    generate(
+        prompts=prompts,
+        model_name=model_name_or_path,
+        batch_size=n_batch_size,
+        n=n_completions,
+        num_tokens=max_new_tokens,
+        temperature=temperature,
+        top_p=top_p,
+        output_file=completions_output_file,
+    )
+    evaluate(
+        completions_file=completions_output_file,
+        results_output_file=results_output_file,
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--model_name_or_path",
+        type=str,
+        help="pretrained model name or path",
+        default="meta-llama/Llama-3.1-8B-Instruct",
+    )
+    parser.add_argument(
+        "--completions_output_file",
+        type=str,
+        help="where to dump the generations (should be a jsonl file)",
+        default="data/diversityTuning/completions.jsonl",
+    )
+    parser.add_argument(
+        "--results_output_file",
+        type=str,
+        help="where to dump the results (should be a json file)",
+        default="results/diversityTuning/results.json",
+    )
+    parser.add_argument(
+        "--n_completions",
+        type=int,
+        help="the number of completions for each prompt. should be divisible by batch size",
+        default=50,
+    )
+    parser.add_argument(
+        "--n_batch_size", type=int, help="batch size of generation", default=10
+    )
+    parser.add_argument(
+        "--max_new_tokens",
+        type=int,
+        help="max number of tokens to sample",
+        default=2048,
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        help="temperature for sampling",
+        default=1.0,
+    )
+    parser.add_argument(
+        "--top_p",
+        type=float,
+        help="top_p for sampling",
+        default=0.9,
+    )
+
+    args = parser.parse_args()
+
+    # Take the cleaned test set
+    ds = datasets.load_from_disk("data/diversityTuning/writingPrompt_cleaned")
+    val_dataset = ds["test"]
+
+    # replicating same sampled data as in original paper
+    val_dataset = val_dataset.select(range(1000, 2000))
+    post_titles = val_dataset["post_title"]
+
+    generate_and_evaluate(
+        prompts=post_titles,
+        model_name_or_path=args.model_name_or_path,
+        completions_output_file=args.completions_output_file,
+        results_output_file=args.results_output_file,
+        n_completions=args.n_completions,
+        n_batch_size=args.n_batch_size,
+        max_new_tokens=args.max_new_tokens,
+        temperature=args.temperature,
+        top_p=args.top_p,
+    )
+
+
+if __name__ == "__main__":
+    main()

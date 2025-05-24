@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 from datasets import load_dataset
+from tqdm import tqdm
 
 from trout.metrics import DiversityScorer
 from trout.utils.chat_models import get_chat_model
@@ -26,16 +27,18 @@ def generate(
     model = get_chat_model(
         model_name=model_name,
         config={
+            "use_tqdm": False,
             "max_num_seqs": batch_size,
             "gpu_memory_utilization": 0.8,
             "temperature": 1.0,
             "top_p": 0.9,
             "num_tokens": 2048,
+            "n_devices": 2,
         },
     )
 
     results = []
-    for prompt in prompts:
+    for prompt in tqdm(prompts):
         duplicated_prompts = [prompt for _ in range(n_completions)]
         completions = model.batch_generate(duplicated_prompts)
         results.append(
@@ -104,7 +107,6 @@ def main():
     args = parser.parse_args()
 
     prompts = load_prompts()
-    prompts = prompts[:10]
 
     generate_and_evaluate(
         prompts=prompts,
